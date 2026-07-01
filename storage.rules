@@ -1,0 +1,9 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /equipment-photos/{allPaths=**} {
+      // Any signed-in user (admin or technician) can upload and view inspection photos.
+      allow read, write: if request.auth != null;
+    }
+  }
+}
