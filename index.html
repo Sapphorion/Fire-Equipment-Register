@@ -186,6 +186,12 @@
         <input id="siteAddressInput" placeholder="Street, suburb, city">
         <label>Notes (optional)</label>
         <textarea id="siteNotesInput" placeholder="Access instructions, site contact, etc."></textarea>
+        <label>Site category</label>
+        <select id="siteCategoryInput">
+          <option value="">None</option>
+          <option value="survey">Survey required</option>
+          <option value="servicing">Servicing required</option>
+        </select>
         <label>Assign technicians</label>
         <div id="assignTechList" class="card" style="background:var(--paper); padding:10px 14px;"></div>
         <div class="row" style="margin-top:16px;">
@@ -476,9 +482,10 @@ function paintSites(){
   }
   wrap.innerHTML = sitesCache.map(s=>{
     const editBtn = currentRole==='admin' ? `<span class="edit-ic" onclick="event.stopPropagation(); openSiteForm('${s.id}')">✏️</span>` : '';
+    const categoryHtml = s.category ? `<span class="pill ${s.category==='survey'?'due':'pass'}">${escapeHtml(siteCategoryLabel(s.category))}</span>` : '';
     return `<div class="card site-card" onclick="openSite('${s.id}')">
       <div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${escapeHtml(s.address||'No address on file')}</div></div>
-      <div style="display:flex; align-items:center;">${editBtn}</div>
+      <div style="display:flex; align-items:center; gap:8px;">${categoryHtml}${editBtn}</div>
     </div>`;
   }).join('');
 }
@@ -487,7 +494,8 @@ function openSite(id){
   currentSiteId = id;
   const site = sitesCache.find(s=>s.id===id);
   document.getElementById('siteDetailName').textContent = site ? site.name : '';
-  document.getElementById('siteDetailAddress').textContent = site ? (site.address||'') : '';
+  const addr = site ? ((site.address||'') + (site.category ? (' · ' + siteCategoryLabel(site.category)) : '')) : '';
+  document.getElementById('siteDetailAddress').textContent = addr;
   showView('view-site-detail');
   loadEquipmentForSite(id);
 }
@@ -509,10 +517,12 @@ async function openSiteForm(id){
     document.getElementById('siteAddressInput').value = site.address||'';
     document.getElementById('siteNotesInput').value = site.notes||'';
     assigned = site.assignedTo || [];
+    document.getElementById('siteCategoryInput').value = site.category || '';
   } else {
     document.getElementById('siteNameInput').value='';
     document.getElementById('siteAddressInput').value='';
     document.getElementById('siteNotesInput').value='';
+    document.getElementById('siteCategoryInput').value='';
   }
   const listEl = document.getElementById('assignTechList');
   if(techsCache.length===0){
@@ -537,6 +547,8 @@ async function saveSite(){
     notes: document.getElementById('siteNotesInput').value.trim(),
     assignedTo: checked
   };
+  // Site category: 'survey' | 'servicing' | ''
+  payload.category = document.getElementById('siteCategoryInput').value || '';
   try{
     if(editingSiteId){
       await db.collection('sites').doc(editingSiteId).update(payload);
@@ -606,6 +618,8 @@ function typeLabel(t){
   return map[t] || t;
 }
 function statusLabel(s){ return s==='fail' ? 'Non-compliant' : (s==='attention' ? 'Needs attention' : 'Compliant'); }
+
+function siteCategoryLabel(c){ if(c==='survey') return 'Survey'; if(c==='servicing') return 'Servicing'; return ''; }
 
 /* ---------- Checklist definitions per type ---------- */
 const CHECKLISTS = {
