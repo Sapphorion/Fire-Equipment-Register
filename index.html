@@ -214,6 +214,7 @@
           <button class="btn secondary" style="flex-shrink:0; white-space:nowrap;" onclick="toggleSiteCompletion()">Reopen</button>
         </div>
       </div>
+      <button class="btn secondary" id="certBtn" style="margin-top:10px; display:none;" onclick="openCertificate(currentSiteId)">🖨 Generate certificate</button>
       <div id="activeSiteControls">
         <button class="btn" onclick="openEquipmentForm(null)" style="margin-bottom:10px;">+ Add equipment record</button>
         <button class="btn secondary" onclick="completeSite()" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green); margin-bottom:10px;">✓ Complete this site</button>
@@ -338,7 +339,7 @@
   <nav class="bottom" id="bottomNav">
     <button id="navSites" class="active" onclick="showView('view-sites')"><span class="ic">🏢</span><span id="navSitesLabel">Sites</span></button>
     <button id="navTechnicians" style="display:none;" onclick="showView('view-technicians')"><span class="ic">👤</span><span>Techs</span></button>
-    <button id="navExport" onclick="showView('view-export'); refreshExport();"><span class="ic">⬇</span><span>Export</span></button>
+    <button id="navExport" style="display:none;" onclick="showView('view-export'); refreshExport(); loadCompanySettings();"><span class="ic">⬇</span><span>Export</span></button>
   </nav>
 </div>
 
@@ -445,6 +446,8 @@ function setupRoleUI(){
   document.getElementById('addSiteBtn').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('navTechnicians').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('sitesTitle').textContent = isAdmin ? 'All sites' : 'My sites';
+  document.getElementById('certBtn').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('navExport').style.display = isAdmin ? 'flex' : 'none';
 }
 
 /* ---------- View routing ---------- */
@@ -619,12 +622,15 @@ function updateSiteDetailCompletion(){
   const site = sitesCache.find(s=>s.id===currentSiteId);
   const statusCard = document.getElementById('completionStatusCard');
   const activeControls = document.getElementById('activeSiteControls');
+  const certBtn = document.getElementById('certBtn');
   if(site && site.completed){
     statusCard.style.display='block';
     activeControls.style.display='none';
+    certBtn.style.display='block';
   } else {
     statusCard.style.display='none';
     activeControls.style.display='block';
+    certBtn.style.display='none';
   }
 }
 
