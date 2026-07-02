@@ -208,7 +208,16 @@
         <button onclick="showView('view-sites')">←</button>
         <div><h2 id="siteDetailName">Site</h2><div class="hint" id="siteDetailAddress"></div></div>
       </div>
-      <button class="btn" onclick="openEquipmentForm(null)">+ Add equipment record</button>
+      <div class="card" id="completionStatusCard" style="display:none; padding:14px; background:var(--green-bg); border:1px solid var(--green);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div><strong style="color:var(--green);">✓ This site is complete</strong><div class="hint" style="margin-top:4px;">You can still add or edit equipment records.</div></div>
+          <button class="btn secondary" style="flex-shrink:0; white-space:nowrap;" onclick="toggleSiteCompletion()">Reopen</button>
+        </div>
+      </div>
+      <div id="activeSiteControls">
+        <button class="btn" onclick="openEquipmentForm(null)" style="margin-bottom:10px;">+ Add equipment record</button>
+        <button class="btn secondary" onclick="completeSite()" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green); margin-bottom:10px;">✓ Complete this site</button>
+      </div>
       <div class="divider"></div>
       <div id="equipmentList"></div>
     </section>
@@ -234,6 +243,7 @@
           <option value="Hose reel">Hose reel</option>
           <option value="Siren">Siren</option>
           <option value="Fire Blanket">Fire Blanket</option>
+          <option value="Trolley">Trolley</option>
 
         </select>
         <div class="row">
@@ -484,9 +494,10 @@ function paintSites(){
   wrap.innerHTML = sitesCache.map(s=>{
     const editBtn = currentRole==='admin' ? `<span class="edit-ic" onclick="event.stopPropagation(); openSiteForm('${s.id}')">✏️</span>` : '';
     const categoryHtml = s.category ? `<span class="pill ${s.category==='survey'?'due':'pass'}">${escapeHtml(siteCategoryLabel(s.category))}</span>` : '';
+    const completedBadge = s.completed ? `<span class="pill pass" style="background:var(--green-bg); color:var(--green);">✓ Complete</span>` : '';
     return `<div class="card site-card" onclick="openSite('${s.id}')">
       <div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${escapeHtml(s.address||'No address on file')}</div></div>
-      <div style="display:flex; align-items:center; gap:8px;">${categoryHtml}${editBtn}</div>
+      <div style="display:flex; align-items:center; gap:8px;">${completedBadge}${categoryHtml}${editBtn}</div>
     </div>`;
   }).join('');
 }
@@ -498,6 +509,7 @@ function openSite(id){
   const addr = site ? ((site.address||'') + (site.category ? (' · ' + siteCategoryLabel(site.category)) : '')) : '';
   document.getElementById('siteDetailAddress').textContent = addr;
   showView('view-site-detail');
+  updateSiteDetailCompletion();
   loadEquipmentForSite(id);
 }
 
@@ -570,6 +582,50 @@ async function deleteSite(){
     toast('Site deleted');
     showView('view-sites');
   }catch(e){ toast('Error: ' + e.message); }
+}
+
+async function completeSite(){
+  if(!currentSiteId) return;
+  if(!confirm('Mark this site as complete? You can still add or edit equipment records afterwards.')) return;
+  try{
+    await db.collection('sites').doc(currentSiteId).update({
+      completed: true,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Site marked as complete');
+    updateSiteDetailCompletion();
+  }catch(e){ toast('Error: ' + e.message); }
+}
+
+async function toggleSiteCompletion(){
+  if(!currentSiteId) return;
+  try{
+    const site = sitesCache.find(s=>s.id===currentSiteId);
+    if(site.completed){
+      await db.collection('sites').doc(currentSiteId).update({ completed: false });
+      toast('Site reopened');
+    } else {
+      await db.collection('sites').doc(currentSiteId).update({
+        completed: true,
+        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      toast('Site marked as complete');
+    }
+    updateSiteDetailCompletion();
+  }catch(e){ toast('Error: ' + e.message); }
+}
+
+function updateSiteDetailCompletion(){
+  const site = sitesCache.find(s=>s.id===currentSiteId);
+  const statusCard = document.getElementById('completionStatusCard');
+  const activeControls = document.getElementById('activeSiteControls');
+  if(site && site.completed){
+    statusCard.style.display='block';
+    activeControls.style.display='none';
+  } else {
+    statusCard.style.display='none';
+    activeControls.style.display='block';
+  }
 }
 
 /* ---------- Equipment ---------- */
