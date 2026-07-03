@@ -215,6 +215,12 @@
         </div>
       </div>
       <button class="btn secondary" id="certBtn" style="margin-top:10px; display:none;" onclick="openCertificate(currentSiteId)">🖨 Generate certificate</button>
+
+      <div class="card" id="siteCompletionCard" style="padding:12px 16px;">
+        <div id="siteCompletionStatus" class="hint" style="margin:0;">Not yet marked as completed.</div>
+        <button class="btn secondary" style="margin-top:10px;" onclick="markSiteCompleted()">✓ Mark site as completed</button>
+      </div>
+
       <div id="activeSiteControls">
         <button class="btn" onclick="openEquipmentForm(null)" style="margin-bottom:10px;">+ Add equipment record</button>
         <button class="btn secondary" onclick="completeSite()" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green); margin-bottom:10px;">✓ Complete this site</button>
@@ -496,11 +502,10 @@ function paintSites(){
   }
   wrap.innerHTML = sitesCache.map(s=>{
     const editBtn = currentRole==='admin' ? `<span class="edit-ic" onclick="event.stopPropagation(); openSiteForm('${s.id}')">✏️</span>` : '';
-    const categoryHtml = s.category ? `<span class="pill ${s.category==='survey'?'due':'pass'}">${escapeHtml(siteCategoryLabel(s.category))}</span>` : '';
-    const completedBadge = s.completed ? `<span class="pill pass" style="background:var(--green-bg); color:var(--green);">✓ Complete</span>` : '';
+    const completedBadge = s.lastCompletedDate ? `<span class="pill pass" style="margin-left:6px;">✓ ${s.lastCompletedDate}</span>` : '';
     return `<div class="card site-card" onclick="openSite('${s.id}')">
-      <div><div class="name">${escapeHtml(s.name)}</div><div class="meta">${escapeHtml(s.address||'No address on file')}</div></div>
-      <div style="display:flex; align-items:center; gap:8px;">${completedBadge}${categoryHtml}${editBtn}</div>
+      <div><div class="name">${escapeHtml(s.name)} ${completedBadge}</div><div class="meta">${escapeHtml(s.address||'No address on file')}</div></div>
+      <div style="display:flex; align-items:center;">${editBtn}</div>
     </div>`;
   }).join('');
 }
@@ -509,8 +514,8 @@ function openSite(id){
   currentSiteId = id;
   const site = sitesCache.find(s=>s.id===id);
   document.getElementById('siteDetailName').textContent = site ? site.name : '';
-  const addr = site ? ((site.address||'') + (site.category ? (' · ' + siteCategoryLabel(site.category)) : '')) : '';
-  document.getElementById('siteDetailAddress').textContent = addr;
+  document.getElementById('siteDetailAddress').textContent = site ? (site.address||'') : '';
+  renderSiteCompletion(site);
   showView('view-site-detail');
   updateSiteDetailCompletion();
   loadEquipmentForSite(id);
@@ -617,20 +622,50 @@ async function toggleSiteCompletion(){
     updateSiteDetailCompletion();
   }catch(e){ toast('Error: ' + e.message); }
 }
+function renderSiteCompletion(site){
+  const el = document.getElementById('siteCompletionStatus');
+  if(site && site.lastCompletedDate){
+    el.textContent = `Marked completed on ${site.lastCompletedDate} by ${site.lastCompletedBy||'—'}`;
+  } else {
+    el.textContent = 'Not yet marked as completed.';
+  }
+}
+
+async function markSiteCompleted(){
+  if(!currentSiteId) return;
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    await db.collection('sites').doc(currentSiteId).update({
+      lastCompletedDate: today,
+      lastCompletedBy: currentProfile.name
+    });
+    toast('Site marked as completed');
+    const site = sitesCache.find(s=>s.id===currentSiteId);
+    if(site){ site.lastCompletedDate = today; site.lastCompletedBy = currentProfile.name; }
+    renderSiteCompletion(site);
+    updateSiteDetailCompletion();
+  }catch(e){ toast('Error: ' + e.message); }
+}
 
 function updateSiteDetailCompletion(){
   const site = sitesCache.find(s=>s.id===currentSiteId);
   const statusCard = document.getElementById('completionStatusCard');
   const activeControls = document.getElementById('activeSiteControls');
   const certBtn = document.getElementById('certBtn');
+  const siteCompletionCard = document.getElementById('siteCompletionCard');
+  const siteCompletionStatus = document.getElementById('siteCompletionStatus');
   if(site && site.completed){
-    statusCard.style.display='block';
-    activeControls.style.display='none';
-    certBtn.style.display='block';
+    if(statusCard) statusCard.style.display='block';
+    if(activeControls) activeControls.style.display='none';
+    if(certBtn) certBtn.style.display='block';
+    if(siteCompletionCard) siteCompletionCard.style.display='none';
+    if(siteCompletionStatus) siteCompletionStatus.textContent = 'This site was completed.';
   } else {
-    statusCard.style.display='none';
-    activeControls.style.display='block';
-    certBtn.style.display='none';
+    if(statusCard) statusCard.style.display='none';
+    if(activeControls) activeControls.style.display='block';
+    if(certBtn) certBtn.style.display='none';
+    if(siteCompletionCard) siteCompletionCard.style.display='block';
+    if(siteCompletionStatus) siteCompletionStatus.textContent = 'Not yet marked as completed.';
   }
 }
 
